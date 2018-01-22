@@ -20,26 +20,26 @@
  */
 package net.sourceforge.metrics.properties;
 
+import java.io.ByteArrayInputStream;
+import java.io.IOException;
+import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.StringTokenizer;
 
-import net.sourceforge.metrics.builder.MetricsNature;
-import net.sourceforge.metrics.core.Constants;
-import net.sourceforge.metrics.core.Log;
-import net.sourceforge.metrics.core.MetricDescriptor;
-import net.sourceforge.metrics.core.MetricsPlugin;
-
+import org.eclipse.core.resources.IFile;
 import org.eclipse.core.resources.IProject;
 import org.eclipse.core.runtime.CoreException;
+import org.eclipse.core.runtime.IPath;
 import org.eclipse.core.runtime.QualifiedName;
 import org.eclipse.jdt.core.IJavaProject;
 import org.eclipse.jdt.core.IPackageFragmentRoot;
 import org.eclipse.jdt.core.JavaCore;
 import org.eclipse.jdt.core.JavaModelException;
 import org.eclipse.jface.dialogs.IDialogConstants;
+import org.eclipse.jface.preference.PreferencePage;
 import org.eclipse.swt.SWT;
 import org.eclipse.swt.custom.TableTree;
 import org.eclipse.swt.custom.TableTreeItem;
@@ -51,7 +51,18 @@ import org.eclipse.swt.widgets.Button;
 import org.eclipse.swt.widgets.Composite;
 import org.eclipse.swt.widgets.Control;
 import org.eclipse.swt.widgets.TableColumn;
+import org.eclipse.ui.IEditorDescriptor;
+import org.eclipse.ui.IWorkbenchPage;
+import org.eclipse.ui.PartInitException;
+import org.eclipse.ui.PlatformUI;
 import org.eclipse.ui.dialogs.PropertyPage;
+import org.eclipse.ui.part.FileEditorInput;
+
+import net.sourceforge.metrics.builder.MetricsNature;
+import net.sourceforge.metrics.core.Constants;
+import net.sourceforge.metrics.core.Log;
+import net.sourceforge.metrics.core.MetricDescriptor;
+import net.sourceforge.metrics.core.MetricsPlugin;
 
 /**
  * Allow metrics enablement/disablement from a project's property page
@@ -83,7 +94,7 @@ public class MetricsPropertyPage extends PropertyPage implements Constants {
 		composite.setLayoutData(data);
 
 		check = new Button(composite, SWT.CHECK);
-		check.setText("Enable Metrics");
+		check.setText("Enable DSLMetrics");
 		IProject p = getProject();
 		try {
 			check.setSelection(p.hasNature(PLUGIN_ID + ".nature"));
@@ -91,8 +102,11 @@ public class MetricsPropertyPage extends PropertyPage implements Constants {
 			Log.logError("Error gettng project nature.", e);
 		}
 		/*
-		 * LATER, for 1.4 release table = new EnableMetricsTable(p, composite, SWT.FULL_SELECTION | SWT.CHECK); data = new GridData(GridData.FILL_BOTH | SWT.H_SCROLL | SWT.V_SCROLL); data.grabExcessHorizontalSpace = true;
-		 * data.grabExcessVerticalSpace = true; table.setLayoutData(data);
+		 * LATER, for 1.4 release table = new EnableMetricsTable(p, composite,
+		 * SWT.FULL_SELECTION | SWT.CHECK); data = new
+		 * GridData(GridData.FILL_BOTH | SWT.H_SCROLL | SWT.V_SCROLL);
+		 * data.grabExcessHorizontalSpace = true; data.grabExcessVerticalSpace =
+		 * true; table.setLayoutData(data);
 		 */
 		return composite;
 	}
@@ -113,9 +127,11 @@ public class MetricsPropertyPage extends PropertyPage implements Constants {
 			boolean hasNature = p.hasNature(PLUGIN_ID + ".nature");
 			if (checked && !hasNature) {
 				MetricsNature.addNatureToProject(p, null);
+				openDSLMetricsFile(p);
 			} else if (!checked && hasNature) {
 				MetricsNature.removeNatureFromProject(p, null);
 			}
+
 			/* TODO for release 1.4: table.persistState(); */
 		} catch (Throwable e) {
 			Log.logError("Error changing project nature.", e);
@@ -126,7 +142,9 @@ public class MetricsPropertyPage extends PropertyPage implements Constants {
 	/*
 	 * (non-Javadoc)
 	 * 
-	 * @see org.eclipse.jface.preference.PreferencePage#contributeButtons(org.eclipse .swt.widgets.Composite)
+	 * @see
+	 * org.eclipse.jface.preference.PreferencePage#contributeButtons(org.eclipse
+	 * .swt.widgets.Composite)
 	 */
 	@Override
 	protected void contributeButtons(Composite parent) {
@@ -143,12 +161,34 @@ public class MetricsPropertyPage extends PropertyPage implements Constants {
 					table.getSelection()[0].setData("patterns", d.getPatterns());
 					table.getSelection()[0].setText(1, concat(d.getPatterns()));
 				}
+
 			}
 
 			public void widgetDefaultSelected(SelectionEvent e) {
 			}
 		});
 		addPattern.setEnabled(false);
+	}
+
+	private void openDSLMetricsFile(IProject project) {
+		try {
+			
+			IFile ifile = project.getFile("Rules.txt");
+			if(!ifile.exists()){
+				String contents = "Write your rules here";
+				InputStream source = new ByteArrayInputStream(contents.getBytes());
+				ifile.create(source, false, null);
+			}
+			IWorkbenchPage page = PlatformUI.getWorkbench().getActiveWorkbenchWindow().getActivePage();
+			IEditorDescriptor desc = PlatformUI.getWorkbench().getEditorRegistry().getDefaultEditor(ifile.getName());
+			page.openEditor(new FileEditorInput(ifile), desc.getId());
+
+		} catch (PartInitException e) {
+			System.out.println("Error openning file!");
+		} catch (CoreException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
 	}
 
 	class EnableMetricsTable extends TableTree implements SelectionListener {
@@ -193,8 +233,10 @@ public class MetricsPropertyPage extends PropertyPage implements Constants {
 						String handle = f.getHandleIdentifier();
 						String fVal = (folder.getChecked()) ? "true" : "false";
 						String fPatterns = folder.getText(1);
-						project.setPersistentProperty(new QualifiedName(Constants.PLUGIN_ID, id + "_" + handle + ".enabled"), fVal);
-						project.setPersistentProperty(new QualifiedName(Constants.PLUGIN_ID, id + "_" + handle + ".patterns"), fPatterns);
+						project.setPersistentProperty(
+								new QualifiedName(Constants.PLUGIN_ID, id + "_" + handle + ".enabled"), fVal);
+						project.setPersistentProperty(
+								new QualifiedName(Constants.PLUGIN_ID, id + "_" + handle + ".patterns"), fPatterns);
 					}
 				} catch (CoreException e) {
 					Log.logError("Could not persist property", e);
@@ -238,7 +280,8 @@ public class MetricsPropertyPage extends PropertyPage implements Constants {
 		}
 
 		/**
-		 * Get the stored exclusion patterns for the given metric and source folder
+		 * Get the stored exclusion patterns for the given metric and source
+		 * folder
 		 * 
 		 * @param id
 		 *            metric-id
@@ -271,7 +314,8 @@ public class MetricsPropertyPage extends PropertyPage implements Constants {
 		 *            metric to be checked
 		 * @param folder
 		 *            source folder to be checked
-		 * @return true if project properties indicate it is enabled or if such property does not exist
+		 * @return true if project properties indicate it is enabled or if such
+		 *         property does not exist
 		 */
 		private boolean isEnabled(String id, IPackageFragmentRoot folder) {
 			boolean mEnabled = isEnabled(id);
@@ -280,7 +324,8 @@ public class MetricsPropertyPage extends PropertyPage implements Constants {
 			}
 			String handle = folder.getHandleIdentifier();
 			try {
-				String val = project.getPersistentProperty(new QualifiedName(Constants.PLUGIN_ID, id + "_" + handle + ".enabled"));
+				String val = project
+						.getPersistentProperty(new QualifiedName(Constants.PLUGIN_ID, id + "_" + handle + ".enabled"));
 				if (val == null) {
 					return true;
 				}
@@ -295,7 +340,8 @@ public class MetricsPropertyPage extends PropertyPage implements Constants {
 		 * Checks persisted project property
 		 * 
 		 * @param id
-		 * @return true if project properties indicate it is enabled or if such property does not exist
+		 * @return true if project properties indicate it is enabled or if such
+		 *         property does not exist
 		 */
 		private boolean isEnabled(String id) {
 			try {
@@ -352,9 +398,12 @@ public class MetricsPropertyPage extends PropertyPage implements Constants {
 		}
 
 		/*
-		 * (non-Javadoc) react to check/uncheck events and check/uncheck and gray/ungray children and dependent metrics
+		 * (non-Javadoc) react to check/uncheck events and check/uncheck and
+		 * gray/ungray children and dependent metrics
 		 * 
-		 * @see org.eclipse.swt.events.SelectionListener#widgetSelected(org.eclipse .swt.events.SelectionEvent)
+		 * @see
+		 * org.eclipse.swt.events.SelectionListener#widgetSelected(org.eclipse
+		 * .swt.events.SelectionEvent)
 		 */
 		public void widgetSelected(SelectionEvent e) {
 			TableTreeItem item = (TableTreeItem) e.item;
@@ -462,10 +511,13 @@ public class MetricsPropertyPage extends PropertyPage implements Constants {
 		/*
 		 * (non-Javadoc)
 		 * 
-		 * @see org.eclipse.swt.events.SelectionListener#widgetDefaultSelected(org .eclipse.swt.events.SelectionEvent)
+		 * @see
+		 * org.eclipse.swt.events.SelectionListener#widgetDefaultSelected(org
+		 * .eclipse.swt.events.SelectionEvent)
 		 */
 		public void widgetDefaultSelected(SelectionEvent e) {
 		}
+
 	}
 
 	private String concat(String[] patterns) {

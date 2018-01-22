@@ -649,7 +649,7 @@
    <extension
          point="org.eclipse.ui.propertyPages">
       <page
-            name="Metrics"
+            name="DSLMetrics"
             class="net.sourceforge.metrics.properties.MetricsPropertyPage"
             nameFilter="*"
             id="net.sourceforge.metrics.properties.MetricsPropertyPage">

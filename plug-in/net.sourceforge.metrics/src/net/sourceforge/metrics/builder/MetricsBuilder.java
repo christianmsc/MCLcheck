@@ -21,6 +21,13 @@
 
 package net.sourceforge.metrics.builder;
 
+import java.io.BufferedReader;
+import java.io.File;
+import java.io.FileNotFoundException;
+import java.io.FileReader;
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedList;
@@ -30,10 +37,13 @@ import java.util.Stack;
 
 import net.sourceforge.metrics.core.Constants;
 import net.sourceforge.metrics.core.Log;
+import net.sourceforge.metrics.core.Metric;
+import net.sourceforge.metrics.core.MetricsPlugin;
 import net.sourceforge.metrics.core.sources.AbstractMetricSource;
 import net.sourceforge.metrics.core.sources.Cache;
 import net.sourceforge.metrics.core.sources.Dispatcher;
 
+import org.eclipse.core.resources.IFile;
 import org.eclipse.core.resources.IMarker;
 import org.eclipse.core.resources.IProject;
 import org.eclipse.core.resources.IResource;
@@ -55,6 +65,8 @@ import org.eclipse.jdt.core.IPackageFragmentRoot;
 import org.eclipse.jdt.core.JavaCore;
 import org.eclipse.jdt.core.JavaModelException;
 
+import dslmetrics.persistences.Rule;
+
 /**
  * builder to (re)calculate metrics for modified java resources.
  * 
@@ -63,7 +75,8 @@ import org.eclipse.jdt.core.JavaModelException;
 public class MetricsBuilder extends IncrementalProjectBuilder {
 
 	public static final String BUILDER_ID = Constants.PLUGIN_ID + ".builder";
-	
+	public static boolean queueIsZero;
+
 	private static Queue queue = new Queue();
 	private static CalculatorThread thread = null;
 	private static ProgressQueue notifier = new ProgressQueue(queue);
@@ -96,10 +109,12 @@ public class MetricsBuilder extends IncrementalProjectBuilder {
 	/*
 	 * (non-Javadoc)
 	 * 
-	 * @see org.eclipse.core.internal.events.InternalBuilder#build(int, java.util.Map, org.eclipse.core.runtime.IProgressMonitor)
+	 * @see org.eclipse.core.internal.events.InternalBuilder#build(int,
+	 * java.util.Map, org.eclipse.core.runtime.IProgressMonitor)
 	 */
 	@Override
-	protected IProject[] build(int kind, @SuppressWarnings("rawtypes") Map args, IProgressMonitor monitor) throws CoreException {
+	protected IProject[] build(int kind, @SuppressWarnings("rawtypes") Map args, IProgressMonitor monitor)
+			throws CoreException {
 		try {
 			if (hasErrors(getProject())) {
 				return null;
@@ -114,14 +129,17 @@ public class MetricsBuilder extends IncrementalProjectBuilder {
 			startCalculatorThread();
 			if (kind == IncrementalProjectBuilder.FULL_BUILD) {
 				fullBuild(currentProject, monitor);
+				checkRules(currentProject);
 			} else {
 				// check for a previously completed full build
 				AbstractMetricSource p = Cache.singleton.get(currentProject);
 				if (p == null) {
 					fullBuild(currentProject, monitor);
+					checkRules(currentProject);
 				} else {
 					IResourceDelta delta = getDelta(getProject());
 					incrementalBuild(delta, monitor);
+					checkRules(currentProject);
 				}
 			}
 		} catch (OperationCanceledException x) {
@@ -140,7 +158,8 @@ public class MetricsBuilder extends IncrementalProjectBuilder {
 	 */
 	private boolean hasErrors(IProject project) {
 		try {
-			IMarker[] markerList = project.findMarkers(IJavaModelMarker.JAVA_MODEL_PROBLEM_MARKER, true, IResource.DEPTH_INFINITE);
+			IMarker[] markerList = project.findMarkers(IJavaModelMarker.JAVA_MODEL_PROBLEM_MARKER, true,
+					IResource.DEPTH_INFINITE);
 			if (markerList == null || markerList.length == 0) {
 				return false;
 			}
@@ -168,7 +187,10 @@ public class MetricsBuilder extends IncrementalProjectBuilder {
 	}
 
 	/**
-	 * Answers true if the commandline that started eclipse contained "-noupdate" This is used to determine whether to calculate metrics in the background (normal operation in UI) or in the foreground (headless operation from Ant)
+	 * Answers true if the commandline that started eclipse contained
+	 * "-noupdate" This is used to determine whether to calculate metrics in the
+	 * background (normal operation in UI) or in the foreground (headless
+	 * operation from Ant)
 	 * 
 	 * @return true if running headless, false when in UI mode
 	 */
@@ -187,7 +209,8 @@ public class MetricsBuilder extends IncrementalProjectBuilder {
 	}
 
 	/**
-	 * Do a full build and recalculate metrics for all java resources in the project
+	 * Do a full build and recalculate metrics for all java resources in the
+	 * project
 	 * 
 	 * @param monitor
 	 * @throws CoreException
@@ -220,8 +243,64 @@ public class MetricsBuilder extends IncrementalProjectBuilder {
 		}
 	}
 
+	private void checkRules(IJavaProject project) {
+		waitForMetricsCalculate();
+		System.out.println("Lendo regras...");
+		ArrayList<Rule> rules = getRules(project);
+		for(Rule rule : rules){
+			if(rule.isViolated()){
+				System.out.print("Regra Violada: ");
+				System.out.println(rule);
+			}
+			else{
+				System.out.print("Regra respeitada: "+rule);
+				System.out.println(rule);
+			}
+		}
+	}
+
+	private void waitForMetricsCalculate() {
+		queueIsZero = false;
+		while (queueIsZero == false) {
+			try {
+				Thread.sleep(100);
+			} catch (InterruptedException e) {
+				e.printStackTrace();
+			}
+		}
+	}
+
+	private ArrayList<Rule> getRules(IJavaProject project) {
+		IFile ifile = project.getProject().getFile("Rules.txt");
+		ArrayList<Rule> rules = null;
+		try {
+			File file = ifile.getRawLocation().makeAbsolute().toFile();
+			BufferedReader b = new BufferedReader(new FileReader(file));
+			String readLine = "";
+			String[] rule;
+			while ((readLine = b.readLine()) != null) {
+
+				rule = readLine.split(" ");
+				if (rules == null) {
+					rules = new ArrayList<Rule>();
+				}
+				rules.add(new Rule(rule, project));
+
+			}
+		} catch (FileNotFoundException e) {
+			e.printStackTrace();
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
+
+		return rules;
+	}
+
+
 	/**
-	 * Contains the result of the resource to IJavaElement translation/filtering and knows how to process it in the context of a full build as well as an incremental build
+	 * Contains the result of the resource to IJavaElement translation/filtering
+	 * and knows how to process it in the context of a full build as well as an
+	 * incremental build
 	 * 
 	 * @author Frank Sauer
 	 */
@@ -241,8 +320,10 @@ public class MetricsBuilder extends IncrementalProjectBuilder {
 		}
 
 		/**
-		 * Push one, two or three ChangedCommand objects onto the stack. One is the normal case. Two if this result holds a source folder with a default package. Three if this result holds a project with no source folders and a default
-		 * package (BUG #766261)
+		 * Push one, two or three ChangedCommand objects onto the stack. One is
+		 * the normal case. Two if this result holds a source folder with a
+		 * default package. Three if this result holds a project with no source
+		 * folders and a default package (BUG #766261)
 		 * 
 		 * @param stack
 		 */
@@ -281,7 +362,9 @@ public class MetricsBuilder extends IncrementalProjectBuilder {
 	}
 
 	/**
-	 * implements both the ResourceVisitor for a full build and the DeltaVisitor for an incremental build. pushes commands on a stack so that they get executed in a depth first order.
+	 * implements both the ResourceVisitor for a full build and the DeltaVisitor
+	 * for an incremental build. pushes commands on a stack so that they get
+	 * executed in a depth first order.
 	 * 
 	 * @author Frank Sauer
 	 */
@@ -398,7 +481,8 @@ public class MetricsBuilder extends IncrementalProjectBuilder {
 		}
 
 		/**
-		 * determines the kind of command needed and pushes it on the stack. Used by incremental builds
+		 * determines the kind of command needed and pushes it on the stack.
+		 * Used by incremental builds
 		 */
 		public boolean visit(IResourceDelta delta) {
 			checkCancel(monitor);
@@ -407,7 +491,8 @@ public class MetricsBuilder extends IncrementalProjectBuilder {
 		}
 
 		/**
-		 * Queue commands in UI mode or execute them immediately in headless mode
+		 * Queue commands in UI mode or execute them immediately in headless
+		 * mode
 		 * 
 		 */
 		public void execute() {
@@ -419,7 +504,8 @@ public class MetricsBuilder extends IncrementalProjectBuilder {
 		}
 
 		/**
-		 * execute commands in the foreground in headless mode so Ant task waits for completion
+		 * execute commands in the foreground in headless mode so Ant task waits
+		 * for completion
 		 */
 		private void executeHeadless() {
 			while (stack.size() > 0) {
@@ -436,7 +522,8 @@ public class MetricsBuilder extends IncrementalProjectBuilder {
 		}
 
 		/**
-		 * Executes all commands on the stack by popping them off until empty fires progress events (pending and completed to listeners)
+		 * Executes all commands on the stack by popping them off until empty
+		 * fires progress events (pending and completed to listeners)
 		 */
 		private void executeUI() {
 			int count = 0;
@@ -615,7 +702,8 @@ public class MetricsBuilder extends IncrementalProjectBuilder {
 		private Semaphore sem = new Semaphore(0);
 
 		/**
-		 * insert command before its nearest ancestor in the queue if found, otherwise, add to the end. This avoids duplicate work.
+		 * insert command before its nearest ancestor in the queue if found,
+		 * otherwise, add to the end. This avoids duplicate work.
 		 * 
 		 * @param command
 		 */
@@ -666,18 +754,19 @@ public class MetricsBuilder extends IncrementalProjectBuilder {
 		}
 
 		/**
-		 * remove all command with a handle starting with the given projectHandle
+		 * remove all command with a handle starting with the given
+		 * projectHandle
 		 * 
 		 * @param projectHandle
 		 */
 		public int removeAll(String projectHandle) {
 			synchronized (this) {
-				//int count = 0;
+				// int count = 0;
 				for (Iterator<Command> i = iterator(); i.hasNext();) {
 					Command next = i.next();
 					if (next.getHandleIdentifier().startsWith(projectHandle)) {
 						i.remove();
-						//count++;
+						// count++;
 					}
 				}
 				int leftOver = size();
@@ -791,6 +880,12 @@ public class MetricsBuilder extends IncrementalProjectBuilder {
 								notifier.fireProjectCompleted((IJavaProject) currentElm, false);
 							}
 						}
+					}
+
+					if (queue.size() != 0) {
+						MetricsBuilder.queueIsZero = false;
+					} else {
+						MetricsBuilder.queueIsZero = true;
 					}
 				}
 			} catch (InterruptedException e) {
