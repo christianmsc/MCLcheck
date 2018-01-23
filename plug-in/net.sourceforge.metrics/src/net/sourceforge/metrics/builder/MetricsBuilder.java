@@ -27,21 +27,12 @@ import java.io.FileNotFoundException;
 import java.io.FileReader;
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.Map;
 import java.util.Set;
 import java.util.Stack;
-
-import net.sourceforge.metrics.core.Constants;
-import net.sourceforge.metrics.core.Log;
-import net.sourceforge.metrics.core.Metric;
-import net.sourceforge.metrics.core.MetricsPlugin;
-import net.sourceforge.metrics.core.sources.AbstractMetricSource;
-import net.sourceforge.metrics.core.sources.Cache;
-import net.sourceforge.metrics.core.sources.Dispatcher;
 
 import org.eclipse.core.resources.IFile;
 import org.eclipse.core.resources.IMarker;
@@ -64,8 +55,19 @@ import org.eclipse.jdt.core.IPackageFragment;
 import org.eclipse.jdt.core.IPackageFragmentRoot;
 import org.eclipse.jdt.core.JavaCore;
 import org.eclipse.jdt.core.JavaModelException;
+import org.eclipse.swt.widgets.Display;
+import org.eclipse.ui.IViewPart;
+import org.eclipse.ui.IWorkbenchPage;
+import org.eclipse.ui.PartInitException;
+import org.eclipse.ui.PlatformUI;
 
 import dslmetrics.persistences.Rule;
+import dslmetrics.persistences.Violation;
+import net.sourceforge.metrics.core.Constants;
+import net.sourceforge.metrics.core.Log;
+import net.sourceforge.metrics.core.sources.AbstractMetricSource;
+import net.sourceforge.metrics.core.sources.Cache;
+import net.sourceforge.metrics.core.sources.Dispatcher;
 
 /**
  * builder to (re)calculate metrics for modified java resources.
@@ -76,6 +78,7 @@ public class MetricsBuilder extends IncrementalProjectBuilder {
 
 	public static final String BUILDER_ID = Constants.PLUGIN_ID + ".builder";
 	public static boolean queueIsZero;
+	public static ArrayList<Violation> violations = null;
 
 	private static Queue queue = new Queue();
 	private static CalculatorThread thread = null;
@@ -244,18 +247,22 @@ public class MetricsBuilder extends IncrementalProjectBuilder {
 	}
 
 	private void checkRules(IJavaProject project) {
+		hideView();
+		violations = null;
 		waitForMetricsCalculate();
-		System.out.println("Lendo regras...");
 		ArrayList<Rule> rules = getRules(project);
 		for(Rule rule : rules){
 			if(rule.isViolated()){
-				System.out.print("Regra Violada: ");
-				System.out.println(rule);
+				if(violations == null){
+					violations = new ArrayList<Violation>();
+				}
+				
+				violations.add(new Violation(rule.getRule(), rule.getCurrentMetricValue()));
 			}
-			else{
-				System.out.print("Regra respeitada: "+rule);
-				System.out.println(rule);
-			}
+		}
+		
+		if(violations != null){
+			openView();
 		}
 	}
 
@@ -294,6 +301,32 @@ public class MetricsBuilder extends IncrementalProjectBuilder {
 		}
 
 		return rules;
+	}
+	
+	private void hideView() {
+		Display.getDefault().asyncExec(new Runnable() {
+		    @Override
+		    public void run() {
+		    	IWorkbenchPage wp = PlatformUI.getWorkbench().getActiveWorkbenchWindow().getActivePage();
+				IViewPart myView = wp.findView("dslmetrics.views.DSLMetricsView");
+				wp.hideView(myView);
+		    }
+		});
+		
+	}
+
+	private void openView() {
+		Display.getDefault().asyncExec(new Runnable() {
+		    @Override
+		    public void run() {
+		    	try {
+					PlatformUI.getWorkbench().getActiveWorkbenchWindow().getActivePage().showView("dslmetrics.views.DSLMetricsView");
+				} catch (PartInitException e) {
+					e.printStackTrace();
+				}
+		    }
+		});
+		
 	}
 
 

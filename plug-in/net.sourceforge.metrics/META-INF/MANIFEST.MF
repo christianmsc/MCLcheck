@@ -113,6 +113,7 @@ Require-Bundle: org.eclipse.jdt.ui,
  org.eclipse.core.runtime,
  org.junit,
  org.eclipse.jface,
- org.eclipse.ui.workbench
+ org.eclipse.ui.workbench,
+ org.eclipse.ui
 Bundle-ActivationPolicy: lazy
 Bundle-RequiredExecutionEnvironment: JavaSE-1.6
