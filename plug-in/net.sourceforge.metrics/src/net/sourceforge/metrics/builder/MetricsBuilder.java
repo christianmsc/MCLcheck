@@ -61,8 +61,8 @@ import org.eclipse.ui.IWorkbenchPage;
 import org.eclipse.ui.PartInitException;
 import org.eclipse.ui.PlatformUI;
 
-import dslmetrics.persistences.Rule;
-import dslmetrics.persistences.Violation;
+import mcl.persistences.Rule;
+import mcl.persistences.Violation;
 import net.sourceforge.metrics.core.Constants;
 import net.sourceforge.metrics.core.Log;
 import net.sourceforge.metrics.core.sources.AbstractMetricSource;

@@ -40,7 +40,7 @@
             id="net.sourceforge.metrics.ui.layeredpackagegraph.LayeredPackageGraphView"/>
       <view
             category="net.sourceforge.metrics"
-            class="dslmetrics.views.DSLMetricsView"
+            class="mcl.views.MCLCheckView"
             icon="icons/exclamation.png"
             id="dslmetrics.views.DSLMetricsView"
             name="MCLCheck: Violations">
@@ -656,7 +656,7 @@
    <extension
          point="org.eclipse.ui.propertyPages">
       <page
-            name="DSLMetrics"
+            name="MCLCheck"
             class="net.sourceforge.metrics.properties.MetricsPropertyPage"
             nameFilter="*"
             id="net.sourceforge.metrics.properties.MetricsPropertyPage">

@@ -1,4 +1,4 @@
-package dslmetrics.persistences;
+package mcl.persistences;
 
 public interface RuleTypes {
 

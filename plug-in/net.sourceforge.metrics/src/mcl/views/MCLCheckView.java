@@ -1,10 +1,10 @@
-package dslmetrics.views;
+package mcl.views;
 
 
 import org.eclipse.swt.widgets.Composite;
 import org.eclipse.ui.part.*;
 
-import dslmetrics.persistences.Violation;
+import mcl.persistences.Violation;
 import net.sourceforge.metrics.builder.MetricsBuilder;
 
 import org.eclipse.jface.viewers.*;
@@ -35,7 +35,7 @@ import org.eclipse.swt.SWT;
  * <p>
  */
 
-public class DSLMetricsView extends ViewPart {
+public class MCLCheckView extends ViewPart {
 
 	/**
 	 * The ID of the view as specified by the extension.
@@ -48,7 +48,7 @@ public class DSLMetricsView extends ViewPart {
 	/**
 	 * The constructor.
 	 */
-	public DSLMetricsView() {
+	public MCLCheckView() {
 	}
 
 	/**
