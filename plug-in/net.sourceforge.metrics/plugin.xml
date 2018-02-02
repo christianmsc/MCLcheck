@@ -41,9 +41,9 @@
       <view
             category="net.sourceforge.metrics"
             class="dslmetrics.views.DSLMetricsView"
-            icon="icons/sample.gif"
+            icon="icons/exclamation.png"
             id="dslmetrics.views.DSLMetricsView"
-            name="DSLMetrics - Violations">
+            name="MCLCheck: Violations">
       </view>
    </extension>
    <extension

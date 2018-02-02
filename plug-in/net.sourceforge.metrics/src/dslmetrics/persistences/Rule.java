@@ -13,7 +13,6 @@ import org.eclipse.jdt.core.IMethod;
 import org.eclipse.jdt.core.IPackageFragment;
 import org.eclipse.jdt.core.IPackageFragmentRoot;
 import org.eclipse.jdt.core.IType;
-import org.eclipse.jdt.core.ITypeParameter;
 import org.eclipse.jdt.core.JavaModelException;
 
 import net.sourceforge.metrics.core.Metric;
@@ -34,12 +33,14 @@ public class Rule implements RuleTypes {
 	private String operator;
 	private double valueDesired;
 	private double valueDesired2;
-	private double topBottonValue;
+	private int topBottonValue;
 	private double currentValue;
 	private boolean isViolated = true;
 	private IJavaProject jp;
 	private ArrayList<IPackageFragment> packageSet;
-
+	private double average;
+	private double[] topOrBottonValues;
+	
 	public Rule(String[] rule, IJavaProject jp) {
 		
 		this.jp = jp;
@@ -88,7 +89,7 @@ public class Rule implements RuleTypes {
 			operator = this.rule.get(2);
 			int first = this.rule.get(3).indexOf("(");
 			int last = this.rule.get(3).lastIndexOf(")");
-			topBottonValue = Double.parseDouble(this.rule.get(3).substring(first + 1, last));
+			topBottonValue = Integer.parseInt(this.rule.get(3).substring(first + 1, last));
 
 		}
 
@@ -153,11 +154,13 @@ public class Rule implements RuleTypes {
 				}
 
 			}
-
+			
+			average = avg / count;
 			return avg / count;
 
 		} catch (JavaModelException e) {
 			e.printStackTrace();
+			average = 0;
 			return 0;
 		}
 	}
@@ -172,7 +175,7 @@ public class Rule implements RuleTypes {
 			isViolated = performPackageSetChecker();
 		}
 
-		if (ruleType == COMPARISON_OPERATOR) {
+		else if (ruleType == COMPARISON_OPERATOR) {
 
 			currentValue = getMetric(sourceElement, metricType);
 
@@ -216,7 +219,9 @@ public class Rule implements RuleTypes {
 		}
 
 		else if (ruleType == IN_TOP || ruleType == IN_BOTTON) {
-
+			
+			currentValue = getMetric(sourceElement, metricType);
+			
 			if (levelSource == PACKAGE) {
 
 				try {
@@ -243,6 +248,9 @@ public class Rule implements RuleTypes {
 										: (m1.getMetric() < m2.getMetric() ? +1 : 0);
 							}
 						});
+						
+						double[] topValues = {sm.get(0).getMetric(),sm.get(topBottonValue-1).getMetric()};
+						topOrBottonValues = topValues;
 
 						for (int i = 0; i < topBottonValue; i++) {
 							if (sm.get(i).getSource().equals(source)) {
@@ -262,6 +270,9 @@ public class Rule implements RuleTypes {
 										: (m1.getMetric() > m2.getMetric() ? +1 : 0);
 							}
 						});
+						
+						double[] bottonValues = {sm.get(0).getMetric(),sm.get(topBottonValue-1).getMetric()};
+						topOrBottonValues = bottonValues;
 
 						for (int i = 0; i < topBottonValue; i++) {
 							if (sm.get(i).getSource().equals(source)) {
@@ -307,6 +318,9 @@ public class Rule implements RuleTypes {
 										: (m1.getMetric() < m2.getMetric() ? +1 : 0);
 							}
 						});
+						
+						double[] topValues = {sm.get(0).getMetric(),sm.get(topBottonValue-1).getMetric()};
+						topOrBottonValues = topValues;
 
 						for (int i = 0; i < topBottonValue; i++) {
 							if (sm.get(i).getSource().equals(source)) {
@@ -326,6 +340,9 @@ public class Rule implements RuleTypes {
 										: (m1.getMetric() > m2.getMetric() ? +1 : 0);
 							}
 						});
+						
+						double[] bottonValues = {sm.get(0).getMetric(),sm.get(topBottonValue-1).getMetric()};
+						topOrBottonValues = bottonValues;
 
 						for (int i = 0; i < topBottonValue; i++) {
 							if (sm.get(i).getSource().equals(source)) {
@@ -375,6 +392,9 @@ public class Rule implements RuleTypes {
 										: (m1.getMetric() < m2.getMetric() ? +1 : 0);
 							}
 						});
+						
+						double[] topValues = {sm.get(0).getMetric(),sm.get(topBottonValue-1).getMetric()};
+						topOrBottonValues = topValues;
 
 						for (int i = 0; i < topBottonValue; i++) {
 							if (sm.get(i).getSource().equals(source)) {
@@ -394,6 +414,9 @@ public class Rule implements RuleTypes {
 										: (m1.getMetric() > m2.getMetric() ? +1 : 0);
 							}
 						});
+						
+						double[] bottonValues = {sm.get(0).getMetric(),sm.get(topBottonValue-1).getMetric()};
+						topOrBottonValues = bottonValues;
 
 						for (int i = 0; i < topBottonValue; i++) {
 							if (sm.get(i).getSource().equals(source)) {
@@ -521,13 +544,19 @@ public class Rule implements RuleTypes {
 				if (currentValue > valueDesired && currentValue < valueDesired2) {
 					isViolated = false;
 				}
+				else{
+					isViolated = true;
+					break;
+				}
 			}
 		}
 
 		else if (ruleType == IN_TOP || ruleType == IN_BOTTON) {
 
 			try {
-
+				
+				currentValue = getMetric(sourceElement, metricType);
+				
 				ArrayList<SourceMetric> sm = new ArrayList<SourceMetric>();
 				IPackageFragment[] packages;
 				packages = jp.getPackageFragments();
@@ -553,6 +582,10 @@ public class Rule implements RuleTypes {
 							if (sm.get(i).getSource().equals(packageFragment.getElementName())) {
 								isViolated = false;
 							}
+							else{
+								isViolated = true;
+								break;
+							}
 						}
 					}
 				}
@@ -571,6 +604,10 @@ public class Rule implements RuleTypes {
 						for (int i = 0; i < topBottonValue; i++) {
 							if (sm.get(i).getSource().equals(packageFragment.getElementName())) {
 								isViolated = false;
+							}
+							else{
+								isViolated = true;
+								break;
 							}
 						}
 					}
@@ -597,7 +634,7 @@ public class Rule implements RuleTypes {
 				}
 
 				// botton values
-				else if (rule.get(3).toLowerCase().contains("bottonvalues")) {
+				else if (rule.get(3).toLowerCase().contains("bottomvalues")) {
 					return IN_BOTTON;
 				}
 			} else {
@@ -649,7 +686,7 @@ public class Rule implements RuleTypes {
 		}
 
 		// Instability (RMI)
-		else if (metric.compareTo("rmi") == 0) {
+		else if (metric.compareTo("rmi") == 0 || metric.toLowerCase().equals("instability")) {
 			metricName = "RMI";
 		}
 
@@ -843,7 +880,7 @@ public class Rule implements RuleTypes {
 		try {
 
 			// Verifica se eh projeto
-			if (source.compareTo("project") == 0 || source.compareTo(jp.getElementName()) == 0) {
+			if (source.compareTo("project") == 0 || source.compareTo(jp.getElementName()) == 0 || source.toLowerCase().equals("system") ) {
 				// levelSourceName = "project";
 				sourceElement = jp.getPrimaryElement();
 				levelSource = PROJECT;
@@ -1020,6 +1057,15 @@ public class Rule implements RuleTypes {
 		return currentValue;
 	}
 
+	public double getAverage(){
+		return average;
+	}
+	
+	public double[] getTopOrBottonValues(){
+		return topOrBottonValues;
+	}
+	
+	
 	class SourceMetric {
 
 		private String source;

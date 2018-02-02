@@ -257,7 +257,7 @@ public class MetricsBuilder extends IncrementalProjectBuilder {
 					violations = new ArrayList<Violation>();
 				}
 				
-				violations.add(new Violation(rule.getRule(), rule.getCurrentMetricValue()));
+				violations.add(new Violation(rule.getRule(), rule.getCurrentMetricValue(), rule.getAverage(), rule.getTopOrBottonValues()));
 			}
 		}
 		

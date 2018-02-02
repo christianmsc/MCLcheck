@@ -94,7 +94,7 @@ public class MetricsPropertyPage extends PropertyPage implements Constants {
 		composite.setLayoutData(data);
 
 		check = new Button(composite, SWT.CHECK);
-		check.setText("Enable DSLMetrics");
+		check.setText("Enable MCLCheck");
 		IProject p = getProject();
 		try {
 			check.setSelection(p.hasNature(PLUGIN_ID + ".nature"));

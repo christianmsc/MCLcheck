@@ -62,8 +62,8 @@ public class DSLMetricsView extends ViewPart {
 		parent.setLayout(layout);
 		viewer = new TableViewer(parent, SWT.MULTI | SWT.H_SCROLL | SWT.V_SCROLL | SWT.FULL_SELECTION | SWT.BORDER);
 
-		String[] titles = { "Rule", "Current Metric"};
-		int[] bounds = {200, 100};
+		String[] titles = { "Rule", "Current Metric Value", "Average", "Top Values", "Bottom Values"};
+		int[] bounds = {300, 150, 100, 100, 100};
 
 		TableViewerColumn col = createTableViewerColumn(titles[0], bounds[0], 0);
 		col.setLabelProvider(new ColumnLabelProvider() {
@@ -80,6 +80,53 @@ public class DSLMetricsView extends ViewPart {
 			public String getText(Object element) {
 				Violation v = (Violation) element;
 				return Double.toString(v.getCurrentMetricValue());
+			}
+		});
+		
+		col = createTableViewerColumn(titles[2], bounds[2], 2);
+		col.setLabelProvider(new ColumnLabelProvider() {
+			@Override
+			public String getText(Object element) {
+				Violation v = (Violation) element;
+				double average = v.getAverage();
+				if(average == 0.0){
+					return "";
+				}
+				else{
+					return Double.toString(v.getAverage());
+				}
+				
+			}
+		});
+		
+		col = createTableViewerColumn(titles[3], bounds[3], 3);
+		col.setLabelProvider(new ColumnLabelProvider() {
+			@Override
+			public String getText(Object element) {
+				Violation v = (Violation) element;
+				double topValues[] = v.getTopValues();
+				if(topValues == null){
+					return "";
+				}
+				else{
+					return "["+topValues[0]+"..."+topValues[1]+"]";
+				}
+				
+			}
+		});
+		
+		col = createTableViewerColumn(titles[4], bounds[4], 4);
+		col.setLabelProvider(new ColumnLabelProvider() {
+			@Override
+			public String getText(Object element) {
+				Violation v = (Violation) element;
+				double bottonValues[] = v.getBottonValues();
+				if(bottonValues == null){
+					return "";
+				}
+				else{
+					return "["+bottonValues[0]+"..."+bottonValues[1]+"]";
+				}
 			}
 		});
 		
